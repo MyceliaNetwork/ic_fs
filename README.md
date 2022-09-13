@@ -1,3 +1,3 @@
 # IC Stable Event FS
 
-Treat stable memory like an append only log 
+Treat stable memory like a append only log 
