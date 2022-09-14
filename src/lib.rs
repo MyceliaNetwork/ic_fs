@@ -104,11 +104,11 @@ impl EventFilesystem {
         }
     }
 
-    fn read_topic_message(&self, id: u64) -> Result<TopicMessage, String> {
+    pub fn read_topic_message(&self, id: u64) -> Result<TopicMessage, String> {
         self.reader.read_topic_message(id, self.read_fn)
     }
 
-    fn write_topic_message<S: Serialize>(&self, data: &S) -> Result<u64, String> {
+    pub fn write_topic_message<S: Serialize>(&self, data: &S) -> Result<u64, String> {
         let mut writer = self.writer.borrow_mut();
         return match writer.write(data, self.write_fn) {
             Ok(idx) => {
@@ -121,7 +121,7 @@ impl EventFilesystem {
         };
     }
 
-    fn read_topic_messages(&self, start: u64, take: u64) -> Result<Vec<TopicMessage>, String> {
+    pub fn read_topic_messages(&self, start: u64, take: u64) -> Result<Vec<TopicMessage>, String> {
         self.reader.read_range(start, take, self.read_fn)
     }
 }
