@@ -1,3 +1,3 @@
 pub struct TopicMessage {
-    pub(crate) data: Vec<u8>,
+    pub data: Vec<u8>,
 }
