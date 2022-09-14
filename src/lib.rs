@@ -11,15 +11,14 @@ use crate::constants::*;
 use crate::index_block::IndexBlock;
 use crate::read_write::{BlockRead, BlockWrite, MemoryReader, MemoryWriter};
 use crate::topic_header_block::{TOPIC_HEADER_MAGIC, TopicHeaderBlock};
-use crate::topic_message::TopicMessage;
+pub use crate::topic_message::TopicMessage;
 
 mod events;
 mod index_block;
 mod topic_header_block;
 mod read_write;
-mod topic_message;
 mod constants;
-
+mod topic_message;
 
 pub struct EventFilesystem {
     write_fn: BlockWrite,
