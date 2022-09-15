@@ -1,6 +1,4 @@
 use std::cell::RefCell;
-use std::f32::consts::E;
-use std::fs::read;
 
 use ic_cdk::api::stable::StableWriter;
 use serde::{Deserialize, Serialize};
