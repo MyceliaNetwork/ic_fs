@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use ic_cdk::api::stable::StableWriter;
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 
@@ -31,6 +32,7 @@ impl EventFilesystem {
                            read_fn: BlockRead,
                            clock: fn() -> u64) -> EventFilesystem {
         let height = read_block_height(read_fn);
+        debug!("EventFilesystem thinks Block height is {}", height);
         let mut writer = RefCell::new(
             MemoryWriter::new(height, IDX_ZONE_OFFSET, clock)
         );
@@ -109,6 +111,7 @@ impl EventFilesystem {
         let mut writer = self.writer.borrow_mut();
         return match writer.write(data, self.write_fn) {
             Ok(idx) => {
+                debug!("Wrote topic_message at index {:?}", idx);
                 write_block_height(writer.block_offset(), self.write_fn);
                 Ok(idx.start_idx)
             }

@@ -1,5 +1,6 @@
 use std::fs::read;
 use std::io::{Read, Write};
+use log::debug;
 
 use serde::Serialize;
 
@@ -103,17 +104,18 @@ impl MemoryReader
         let mut idx_offset = self.idx_start + (height * IDX_BLOCK_SIZE);
         reader(idx_offset, &mut bytes);
         let idx: IndexBlock = bincode::deserialize(&bytes).map_err(|e| format!("Failed to deserialize: {}", e))?;
-
+        debug!("Read index  {:?}", idx);
         let start = IDX_ZONE_END + (idx.start_idx * BLOCK_SIZE);
         let mut buf = vec![0u8; idx.data_size as usize];
-
+        debug!("Reading {:?} from offset {:?}", idx.data_size, start);
         reader(start, &mut buf);
+
         Ok(TopicMessage {
             data: buf
         })
     }
 
-    fn read_idx(&self, offset: u64, reader: BlockRead) -> Result<IndexBlock, String> {
+    pub fn read_idx(&self, offset: u64, reader: BlockRead) -> Result<IndexBlock, String> {
         let mut bytes = [0u8; 32];
         reader(self.idx_start + (IDX_BLOCK_SIZE * offset), &mut bytes);
         let idx = bincode::deserialize(&bytes).map_err(|e| format!("Failed to deserialize: {}", e))?;
