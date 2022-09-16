@@ -1,6 +1,7 @@
 use std::fs::read;
 use std::io::{Read, Write};
 use log::debug;
+use serde::de::DeserializeOwned;
 
 use serde::Serialize;
 
@@ -88,7 +89,7 @@ impl MemoryReader
         }
     }
     // We could do a lotttt more here, but for now we'll just loop
-    pub fn read_range(&self, start: u64, count: u64, reader: BlockRead) -> Result<Vec<TopicMessage>, String> {
+    pub fn read_range<T : DeserializeOwned>(&self, start: u64, count: u64, reader: BlockRead) -> Result<Vec<T>, String> {
         let mut messages = Vec::new();
         for i in start..start + count {
             match self.read_topic_message(i, reader) {
@@ -99,7 +100,7 @@ impl MemoryReader
         Ok(messages)
     }
 
-    pub(crate) fn read_topic_message(&self, height: u64, reader: BlockRead) -> Result<TopicMessage, String> {
+    pub(crate) fn read_topic_message<T : DeserializeOwned>(&self, height: u64, reader: BlockRead) -> Result<T, String> {
         let mut bytes = [0u8; 32];
         let mut idx_offset = self.idx_start + (height * IDX_BLOCK_SIZE);
         reader(idx_offset, &mut bytes);
@@ -110,9 +111,7 @@ impl MemoryReader
         debug!("Reading {:?} from offset {:?}", idx.data_size, start);
         reader(start, &mut buf);
 
-        Ok(TopicMessage {
-            data: buf
-        })
+        bincode::deserialize::<T>(&*buf).map_err(|e| format!("Failed to deserialize: {}", e))
     }
 
     pub fn read_idx(&self, offset: u64, reader: BlockRead) -> Result<IndexBlock, String> {
@@ -173,9 +172,9 @@ mod test {
         let mut reader = get_reader();
 
         let res = writer.write(bytes, write).unwrap();
-        let out = reader.read_topic_message(res.start_idx, read).unwrap();
+        let out = reader.read_topic_message::<Vec<u8>>(res.start_idx, read).unwrap();
 
-        assert_eq!(out.data, bytes);
+        assert_eq!(out, bytes);
     }
 
     #[test]
@@ -191,12 +190,12 @@ mod test {
         let res_two = writer.write(bytes_two, write).unwrap();
         let res_three = writer.write(bytes_three, write).unwrap();
 
-        let out = reader.read_topic_message(res.start_idx, read).unwrap();
-        let out_two = reader.read_topic_message(res_two.start_idx, read).unwrap();
-        let out_three = reader.read_topic_message(res_three.start_idx, read).unwrap();
+        let out = reader.read_topic_message::<Vec<u8>>(res.start_idx, read).unwrap();
+        let out_two = reader.read_topic_message::<Vec<u8>>(res_two.start_idx, read).unwrap();
+        let out_three = reader.read_topic_message::<Vec<u8>>(res_three.start_idx, read).unwrap();
 
-        assert_eq!(out.data, bytes);
-        assert_eq!(out_two.data, bytes_two);
-        assert_eq!(out_three.data, bytes_three);
+        assert_eq!(out, bytes);
+        assert_eq!(out_two, bytes_two);
+        assert_eq!(out_three, bytes_three);
     }
 }

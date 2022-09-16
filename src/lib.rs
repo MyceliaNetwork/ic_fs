@@ -103,7 +103,7 @@ impl EventFilesystem {
         }
     }
 
-    pub fn read_topic_message(&self, id: u64) -> Result<TopicMessage, String> {
+    pub fn read_topic_message<T : DeserializeOwned>(&self, id: u64) -> Result<T, String> {
         self.reader.read_topic_message(id, self.read_fn)
     }
 
@@ -121,8 +121,8 @@ impl EventFilesystem {
         };
     }
 
-    pub fn read_topic_messages(&self, start: u64, take: u64) -> Result<Vec<TopicMessage>, String> {
-        self.reader.read_range(start, take, self.read_fn)
+    pub fn read_topic_messages<T : DeserializeOwned>(&self, start: u64, take: u64) -> Result<Vec<T>, String> {
+        self.reader.read_range::<T>(start, take, self.read_fn)
     }
 }
 
@@ -203,9 +203,9 @@ mod tests {
         let topic_block = read_topic_block(reader);
         assert_eq!(topic_block.event_stream_name, "test");
 
-        let message = b"hello world";
+        let message : String = "hello world".to_string();
 
-        let res = file_system.write_topic_message(message).unwrap();
+        let res = file_system.write_topic_message::<String>(&message).unwrap();
 
         let file_system = EventFilesystem::get_file_system(
             writer,
@@ -213,13 +213,13 @@ mod tests {
             || 0,
         );
 
-        assert_eq!(&file_system.read_topic_messages(res, 1).unwrap()[0].data, message);
+        assert_eq!(file_system.read_topic_messages::<String>(res, 1).unwrap()[0], message);
 
-        let message2 = b"hello world2";
-        let res = file_system.write_topic_message(message2).unwrap();
+        let message2 = "hello world2".to_string();
+        let res = file_system.write_topic_message(&message2).unwrap();
 
         assert_eq!(res, 1);
-        assert_eq!(file_system.read_topic_message(res).unwrap().data, message2);
+        assert_eq!(file_system.read_topic_message::<String>(res).unwrap(), message2);
     }
 
     #[test]
