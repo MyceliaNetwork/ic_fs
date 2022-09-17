@@ -1,6 +1,6 @@
 use std::fs::read;
 use std::io::{Read, Write};
-use log::debug;
+use log::{debug, info};
 use serde::de::DeserializeOwned;
 
 use serde::Serialize;
@@ -64,6 +64,7 @@ impl MemoryWriter
     }
 
     fn write_idx(&mut self, idx: &IndexBlock, writer: BlockWrite) -> Result<(), String> {
+        info!("Writing index block: {:?}", idx);
         let bytes = bincode::serialize(idx).map_err(|e| format!("Failed to serialize: {}", e))?;
         // Move to index region, move over number of blocks
         let mut offset = self.idx_start + (self.block_offset * IDX_BLOCK_SIZE);
