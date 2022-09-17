@@ -19,6 +19,18 @@ pub struct MemoryWriter {
     clock: fn() -> u64,
 }
 
+fn get_block_count(data_size : u64) -> u64 {
+    let mut blocks = data_size / BLOCK_SIZE;
+    if data_size % BLOCK_SIZE != 0 {
+        blocks += 1;
+    }
+    return blocks;
+}
+
+fn get_data_offset_from_height(height: u64) -> u64 {
+    return IDX_ZONE_END + (height * BLOCK_SIZE);
+}
+
 impl MemoryWriter
 {
     pub fn new(block_offset: u64, clock: fn() -> u64) -> Self {
@@ -33,13 +45,7 @@ impl MemoryWriter
         let bytes = bincode::serialize(value).map_err(|e| format!("Failed to serialize: {}", e))?;
 
         // Calculate how many whole blocks we need to fill
-        let mut blocks = bytes.len() / 512;
-        let mut blocks = blocks.max(1);
-
-        // Calculate if we need partial block
-        if bytes.len() > BLOCK_SIZE as usize && bytes.len() % BLOCK_SIZE as usize > 0 {
-            blocks += 1;
-        };
+        let mut blocks = get_block_count(bytes.len() as u64);
 
         let idx = IndexBlock {
             data_size: bytes.len() as u64,
@@ -62,7 +68,6 @@ impl MemoryWriter
     }
 
     fn write_idx(&mut self, idx: &IndexBlock, writer: BlockWrite) -> Result<(), String> {
-
         let bytes = bincode::serialize(idx).map_err(|e| format!("Failed to serialize: {}", e))?;
         // Move to index region, move over number of blocks
         let mut offset = IDX_ZONE_IDX + (self.block_offset * IDX_BLOCK_SIZE);
@@ -86,6 +91,7 @@ impl MemoryReader
         MemoryReader {
         }
     }
+
     // We could do a lotttt more here, but for now we'll just loop
     pub fn read_range<T : DeserializeOwned>(&self, start: u64, count: u64, reader: BlockRead) -> Result<Vec<T>, String> {
         let mut messages = Vec::new();
@@ -102,10 +108,10 @@ impl MemoryReader
         let idx = self.read_idx(height, reader)?;
         debug!("Read index  {:?}", idx);
 
-        let start = IDX_ZONE_END + (idx.start_idx * BLOCK_SIZE);
+        let read_start = get_data_offset_from_height(idx.start_idx);
         let mut buf = vec![0u8; idx.data_size as usize];
-        debug!("Reading {:?} from offset {:?}", idx.data_size, start);
-        reader(start, &mut buf);
+        debug!("Reading {:?} from offset {:?}", idx.data_size, read_start);
+        reader(read_start, &mut buf);
 
         bincode::deserialize::<T>(&*buf).map_err(|e| format!("Failed to deserialize: {}", e))
     }
@@ -123,7 +129,7 @@ mod test {
     use std::cell::RefCell;
 
     use crate::constants::*;
-    use crate::read_write::{MemoryReader, MemoryWriter};
+    use crate::read_write::{get_block_count, get_data_offset_from_height, MemoryReader, MemoryWriter};
 
     thread_local! {
         static MEMORY: RefCell<Vec<u8>> = RefCell::new(vec![0u8; IDX_ZONE_END as usize + 1024 * 1024 * 128]);
@@ -209,5 +215,44 @@ mod test {
 
         assert_eq!(out, bytes);
         assert_eq!(out_two, bytes_two);
+    }
+
+    #[test]
+    fn it_writes_partial_block() {
+        let bytes = vec![12u8; 512];
+        let bytes_two = vec![33u8; 513];
+        let bytes_three = vec![55u8; 512 * 2 + 1];
+
+        let mut writer = get_writer();
+        let mut reader = get_reader();
+
+        let res = writer.write(&bytes, write).unwrap();
+        let res_two = writer.write(&bytes_two, write).unwrap();
+        let res_three = writer.write(&bytes_three, write).unwrap();
+
+        let out = reader.read_topic_message::<Vec<u8>>(res.start_idx, read).unwrap();
+        let out_two = reader.read_topic_message::<Vec<u8>>(res_two.start_idx, read).unwrap();
+        let out_three = reader.read_topic_message::<Vec<u8>>(res_three.start_idx, read).unwrap();
+
+        assert_eq!(out, bytes);
+        assert_eq!(out_two, bytes_two);
+        assert_eq!(out_three, bytes_three);
+    }
+
+    #[test]
+    pub fn it_gets_block_count_for_data() {
+        assert_eq!(get_block_count(0), 0);
+        assert_eq!(get_block_count(1), 1);
+        assert_eq!(get_block_count(512*1), 1);
+        assert_eq!(get_block_count(512*2), 2);
+        assert_eq!(get_block_count(512*2 + 1), 3);
+        assert_eq!(get_block_count(512*10 + 50), 11);
+    }
+
+    #[test]
+    pub fn it_get_offset_from_block_height() {
+        assert_eq!(get_data_offset_from_height(0), IDX_ZONE_END);
+        assert_eq!(get_data_offset_from_height(1), IDX_ZONE_END + BLOCK_SIZE);
+        assert_eq!(get_data_offset_from_height(10), IDX_ZONE_END + BLOCK_SIZE * 10);
     }
 }
