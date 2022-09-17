@@ -137,13 +137,13 @@ mod test {
         MemoryWriter {
             block_offset: 0,
             clock: || 0,
-            idx_start: IDX_ZONE_OFFSET,
+            idx_start: IDX_ZONE_IDX,
         }
     }
 
     fn get_reader() -> MemoryReader {
         MemoryReader {
-            idx_start: IDX_ZONE_OFFSET
+            idx_start: IDX_ZONE_IDX
         }
     }
 

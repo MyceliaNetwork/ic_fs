@@ -34,10 +34,10 @@ impl EventFilesystem {
         let height = read_block_height(read_fn);
         debug!("EventFilesystem thinks Block height is {}", height);
         let mut writer = RefCell::new(
-            MemoryWriter::new(height, IDX_ZONE_OFFSET, clock)
+            MemoryWriter::new(height, IDX_ZONE_IDX, clock)
         );
 
-        let reader = MemoryReader::new(IDX_ZONE_OFFSET);
+        let reader = MemoryReader::new(IDX_ZONE_IDX);
 
         let topic_header = read_topic_block(read_fn);
         EventFilesystem {
@@ -47,6 +47,10 @@ impl EventFilesystem {
             reader,
             topic_header,
         }
+    }
+
+    pub fn get_topic_height(&self) -> u64 {
+        return read_block_height(self.read_fn);
     }
 
     pub fn stable_store<T: Serialize>(&self, data: T) -> Result<(), String> {
@@ -75,9 +79,9 @@ impl EventFilesystem {
                          event_stream_name: String,
     ) -> Self {
         let mut writer = RefCell::new(
-            MemoryWriter::new(0, IDX_ZONE_OFFSET, clock)
+            MemoryWriter::new(0, IDX_ZONE_IDX, clock)
         );
-        let reader = MemoryReader::new(IDX_ZONE_OFFSET);
+        let reader = MemoryReader::new(IDX_ZONE_IDX);
 
         if is_magic_number_valid(read_fn) {
             return Self::get_file_system(write_fn, read_fn, clock);
@@ -152,11 +156,12 @@ fn write_topic_block(header: &TopicHeaderBlock, writer: BlockWrite) -> () {
     assert!(topic_block_bytes.len() <= TOPIC_BLOCK_MAX_SIZE);
     let topic_block_size = (topic_block_bytes.len() as u64).to_le_bytes();
 
-    writer(8, &topic_block_size);
-    writer(16, &topic_block_bytes);
+    writer(TOPIC_BLOCK_SIZE_IDX, &topic_block_size);
+    writer(TOPIC_BLOCK_DATA_START_IDX, &topic_block_bytes);
 }
 
 fn write_block_height(height: u64, writer: BlockWrite) -> () {
+    debug!("Writing block height to stable {}", height);
     writer(TOPIC_HEIGHT_IDX, &height.to_le_bytes());
 }
 
@@ -220,6 +225,34 @@ mod tests {
 
         assert_eq!(res, 1);
         assert_eq!(file_system.read_topic_message::<String>(res).unwrap(), message2);
+    }
+
+    #[test]
+    fn it_updates_topic_height() {
+        let writer = get_write();
+        let reader = get_read();
+
+        let file_system = EventFilesystem::get_or_create(
+            writer,
+            reader,
+            || 0,
+            "test".to_string(),
+        );
+
+        assert_eq!(file_system.get_topic_height(), 0);
+        for i in 0..100 {
+            let message : String = format!("hello world {}", i);
+            let res = file_system.write_topic_message::<String>(&message).unwrap();
+        }
+        assert_eq!(file_system.get_topic_height(), 100);
+
+        let file_system = EventFilesystem::get_file_system(
+            writer,
+            reader,
+            || 0,
+        );
+
+        assert_eq!(file_system.get_topic_height(), 100);
     }
 
     #[test]
