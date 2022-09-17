@@ -31,10 +31,12 @@ impl EventFilesystem {
     pub fn get_file_system(write_fn: BlockWrite,
                            read_fn: BlockRead,
                            clock: fn() -> u64) -> EventFilesystem {
-        let height = read_block_height(read_fn);
-        debug!("EventFilesystem thinks Block height is {}", height);
+        let data_block_height = read_data_block_height(read_fn);
+        let index_height = read_index_height(read_fn);
+
+        debug!("EventFilesystem data_block_height {} index_height {}", data_block_height, index_height);
         let mut writer = RefCell::new(
-            MemoryWriter::new(height,  clock)
+            MemoryWriter::new(index_height, data_block_height,  clock)
         );
 
         let reader = MemoryReader::new();
@@ -50,7 +52,7 @@ impl EventFilesystem {
     }
 
     pub fn get_topic_height(&self) -> u64 {
-        return read_block_height(self.read_fn);
+        return read_index_height(self.read_fn);
     }
 
     pub fn stable_store<T: Serialize>(&self, data: T) -> Result<(), String> {
@@ -79,7 +81,7 @@ impl EventFilesystem {
                          event_stream_name: String,
     ) -> Self {
         let mut writer = RefCell::new(
-            MemoryWriter::new(0, clock)
+            MemoryWriter::new(0, 0, clock)
         );
         let reader = MemoryReader::new();
 
@@ -87,7 +89,8 @@ impl EventFilesystem {
             return Self::get_file_system(write_fn, read_fn, clock);
         } else {
             write_magic_number(write_fn);
-            write_block_height(0, write_fn);
+            write_index_height(0, write_fn);
+            write_data_block_height(0, write_fn);
 
             let topic_block = TopicHeaderBlock {
                 event_stream_name,
@@ -116,7 +119,9 @@ impl EventFilesystem {
         return match writer.write(data, self.write_fn) {
             Ok(idx) => {
                 debug!("Wrote topic_message at index {:?}", idx);
-                write_block_height(writer.block_offset(), self.write_fn);
+                write_index_height(writer.index_block_offset(), self.write_fn);
+                write_data_block_height(writer.data_block_offset(), self.write_fn);
+
                 Ok(idx.start_idx)
             }
             Err(e) => {
@@ -160,14 +165,25 @@ fn write_topic_block(header: &TopicHeaderBlock, writer: BlockWrite) -> () {
     writer(TOPIC_BLOCK_DATA_START_IDX, &topic_block_bytes);
 }
 
-fn write_block_height(height: u64, writer: BlockWrite) -> () {
+fn write_index_height(height: u64, writer: BlockWrite) -> () {
     debug!("Writing block height to stable {}", height);
-    writer(TOPIC_HEIGHT_IDX, &height.to_le_bytes());
+    writer(INDEX_HEIGHT_IDX, &height.to_le_bytes());
 }
 
-fn read_block_height(reader: BlockRead) -> u64 {
+fn write_data_block_height(height: u64, writer: BlockWrite) -> () {
+    debug!("Writing block height to stable {}", height);
+    writer(DATA_BLOCK_HEIGHT_IDX, &height.to_le_bytes());
+}
+
+fn read_index_height(reader: BlockRead) -> u64 {
     let mut bytes = [0u8; 8];
-    reader(TOPIC_HEIGHT_IDX, &mut bytes);
+    reader(INDEX_HEIGHT_IDX, &mut bytes);
+    u64::from_le_bytes(bytes)
+}
+
+fn read_data_block_height(reader: BlockRead) -> u64 {
+    let mut bytes = [0u8; 8];
+    reader(DATA_BLOCK_HEIGHT_IDX, &mut bytes);
     u64::from_le_bytes(bytes)
 }
 

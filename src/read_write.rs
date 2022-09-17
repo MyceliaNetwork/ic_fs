@@ -14,8 +14,8 @@ pub type BlockWrite = fn(offset: u64, data: &[u8]) -> ();
 pub type BlockRead = fn(offset: u64, buf: &mut [u8]) -> ();
 
 pub struct MemoryWriter {
-    block_offset: u64,
-    // Start index of the index block zone
+    index_block_offset: u64,
+    data_block_offset: u64,
     clock: fn() -> u64,
 }
 
@@ -33,13 +33,13 @@ fn get_data_offset_from_height(height: u64) -> u64 {
 
 impl MemoryWriter
 {
-    pub fn new(block_offset: u64, clock: fn() -> u64) -> Self {
+    pub fn new(index_block_offset: u64, data_block_offset: u64, clock: fn() -> u64) -> Self {
         MemoryWriter {
-            block_offset,
+            index_block_offset,
+            data_block_offset,
             clock,
         }
     }
-
 
     pub fn write<S: Serialize>(&mut self, value: &S, writer: BlockWrite) -> Result<IndexBlock, String> {
         let bytes = bincode::serialize(value).map_err(|e| format!("Failed to serialize: {}", e))?;
@@ -49,8 +49,8 @@ impl MemoryWriter
 
         let idx = IndexBlock {
             data_size: bytes.len() as u64,
-            start_idx: self.block_offset,
-            end_idx: self.block_offset + blocks as u64,
+            start_idx: self.data_block_offset,
+            end_idx: self.data_block_offset + blocks as u64,
             timestamp: (self.clock)(),
         };
 
@@ -58,32 +58,36 @@ impl MemoryWriter
         self.write_idx(&idx, writer);
 
         // write data
-        let offset = IDX_ZONE_END + (self.block_offset * BLOCK_SIZE);
+        let offset = IDX_ZONE_END + (self.data_block_offset * BLOCK_SIZE);
         info!("Writing data at offset {} for idx {:?}", offset, idx);
         writer(offset, &bytes);
 
         // move offset
-        self.block_offset += blocks as u64;
+        self.data_block_offset += blocks as u64;
+        self.index_block_offset += 1;
+
         Ok(idx)
     }
 
     fn write_idx(&mut self, idx: &IndexBlock, writer: BlockWrite) -> Result<(), String> {
         let bytes = bincode::serialize(idx).map_err(|e| format!("Failed to serialize: {}", e))?;
         // Move to index region, move over number of blocks
-        let mut offset = IDX_ZONE_IDX + (self.block_offset * IDX_BLOCK_SIZE);
+        let mut offset = IDX_ZONE_IDX + (self.data_block_offset * IDX_BLOCK_SIZE);
         info!("Writing index block: {:?} offset {}", idx, offset);
         writer(offset, &bytes);
         Ok(())
     }
 
-    pub fn block_offset(&self) -> u64 {
-        self.block_offset
+    pub fn data_block_offset(&self) -> u64 {
+        self.data_block_offset
+    }
+
+    pub fn index_block_offset(&self) -> u64 {
+        self.index_block_offset
     }
 }
 
-pub struct MemoryReader
-{
-}
+pub struct MemoryReader;
 
 impl MemoryReader
 {
@@ -137,7 +141,8 @@ mod test {
 
     fn get_writer() -> MemoryWriter {
         MemoryWriter {
-            block_offset: 0,
+            index_block_offset: 0,
+            data_block_offset: 0,
             clock: || 0,
         }
     }
