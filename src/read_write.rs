@@ -130,7 +130,7 @@ mod test {
     use crate::read_write::{MemoryReader, MemoryWriter};
 
     thread_local! {
-        static MEMORY: RefCell<Vec<u8>> = RefCell::new(vec![0u8; IDX_ZONE_END as usize + 1024 * 1024]);
+        static MEMORY: RefCell<Vec<u8>> = RefCell::new(vec![0u8; IDX_ZONE_END as usize + 1024 * 1024 * 128]);
     }
 
     fn get_writer() -> MemoryWriter {
@@ -167,35 +167,53 @@ mod test {
 
     #[test]
     fn it_writes_and_reads_a_blob() {
-        let bytes = b"Hello, world!";
+        let message = "Hello, world!".to_string();
         let mut writer = get_writer();
         let mut reader = get_reader();
 
-        let res = writer.write(bytes, write).unwrap();
-        let out = reader.read_topic_message::<Vec<u8>>(res.start_idx, read).unwrap();
+        let res = writer.write(&message, write).unwrap();
+        let out = reader.read_topic_message::<String>(res.start_idx, read).unwrap();
 
-        assert_eq!(out, bytes);
+        assert_eq!(out, message);
     }
 
     #[test]
     fn it_writes_and_reads_multiple() {
-        let bytes = b"Hello, world!";
-        let bytes_two = b"Foo Bar Baz";
-        let bytes_three = b"A";
+        let bytes = "Hello, world!".to_string();
+        let bytes_two = "Foo Bar Baz".to_string();
+        let bytes_three = "A".to_string();
 
         let mut writer = get_writer();
         let mut reader = get_reader();
 
-        let res = writer.write(bytes, write).unwrap();
-        let res_two = writer.write(bytes_two, write).unwrap();
-        let res_three = writer.write(bytes_three, write).unwrap();
+        let res = writer.write(&bytes, write).unwrap();
+        let res_two = writer.write(&bytes_two, write).unwrap();
+        let res_three = writer.write(&bytes_three, write).unwrap();
 
-        let out = reader.read_topic_message::<Vec<u8>>(res.start_idx, read).unwrap();
-        let out_two = reader.read_topic_message::<Vec<u8>>(res_two.start_idx, read).unwrap();
-        let out_three = reader.read_topic_message::<Vec<u8>>(res_three.start_idx, read).unwrap();
+        let out = reader.read_topic_message::<String>(res.start_idx, read).unwrap();
+        let out_two = reader.read_topic_message::<String>(res_two.start_idx, read).unwrap();
+        let out_three = reader.read_topic_message::<String>(res_three.start_idx, read).unwrap();
 
         assert_eq!(out, bytes);
         assert_eq!(out_two, bytes_two);
         assert_eq!(out_three, bytes_three);
+    }
+
+    #[test]
+    fn it_writes_and_reads_large_multiple() {
+        let bytes = vec![12u8; 1024 * 1024];
+        let bytes_two = vec![33u8; 1024 * 1024];
+
+        let mut writer = get_writer();
+        let mut reader = get_reader();
+
+        let res = writer.write(&bytes, write).unwrap();
+        let res_two = writer.write(&bytes_two, write).unwrap();
+
+        let out = reader.read_topic_message::<Vec<u8>>(res.start_idx, read).unwrap();
+        let out_two = reader.read_topic_message::<Vec<u8>>(res_two.start_idx, read).unwrap();
+
+        assert_eq!(out, bytes);
+        assert_eq!(out_two, bytes_two);
     }
 }
