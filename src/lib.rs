@@ -34,10 +34,10 @@ impl EventFilesystem {
         let height = read_block_height(read_fn);
         debug!("EventFilesystem thinks Block height is {}", height);
         let mut writer = RefCell::new(
-            MemoryWriter::new(height, IDX_ZONE_IDX, clock)
+            MemoryWriter::new(height,  clock)
         );
 
-        let reader = MemoryReader::new(IDX_ZONE_IDX);
+        let reader = MemoryReader::new();
 
         let topic_header = read_topic_block(read_fn);
         EventFilesystem {
@@ -79,9 +79,9 @@ impl EventFilesystem {
                          event_stream_name: String,
     ) -> Self {
         let mut writer = RefCell::new(
-            MemoryWriter::new(0, IDX_ZONE_IDX, clock)
+            MemoryWriter::new(0, clock)
         );
-        let reader = MemoryReader::new(IDX_ZONE_IDX);
+        let reader = MemoryReader::new();
 
         if is_magic_number_valid(read_fn) {
             return Self::get_file_system(write_fn, read_fn, clock);
