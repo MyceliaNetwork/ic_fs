@@ -72,7 +72,7 @@ impl MemoryWriter
     fn write_idx(&mut self, idx: &IndexBlock, writer: BlockWrite) -> Result<(), String> {
         let bytes = bincode::serialize(idx).map_err(|e| format!("Failed to serialize: {}", e))?;
         // Move to index region, move over number of blocks
-        let mut offset = IDX_ZONE_IDX + (self.data_block_offset * IDX_BLOCK_SIZE);
+        let mut offset = IDX_ZONE_IDX + (self.index_block_offset * IDX_BLOCK_SIZE);
         info!("Writing index block: {:?} offset {}", idx, offset);
         writer(offset, &bytes);
         Ok(())
