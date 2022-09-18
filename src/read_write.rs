@@ -48,6 +48,7 @@ impl MemoryWriter
         let mut blocks = get_block_count(bytes.len() as u64);
 
         let idx = IndexBlock {
+            height: self.index_block_offset,
             data_size: bytes.len() as u64,
             start_idx: self.data_block_offset,
             end_idx: self.data_block_offset + blocks as u64,
@@ -72,7 +73,7 @@ impl MemoryWriter
     fn write_idx(&mut self, idx: &IndexBlock, writer: BlockWrite) -> Result<(), String> {
         let bytes = bincode::serialize(idx).map_err(|e| format!("Failed to serialize: {}", e))?;
         // Move to index region, move over number of blocks
-        let mut offset = IDX_ZONE_IDX + (self.index_block_offset * IDX_BLOCK_SIZE);
+        let mut offset = IDX_ZONE_IDX + (idx.height * IDX_BLOCK_SIZE);
         info!("Writing index block: {:?} offset {}", idx, offset);
         writer(offset, &bytes);
         Ok(())
@@ -121,7 +122,7 @@ impl MemoryReader
     }
 
     pub fn read_idx(&self, offset: u64, reader: BlockRead) -> Result<IndexBlock, String> {
-        let mut bytes = [0u8; 32];
+        let mut bytes = [0u8; IDX_BLOCK_SIZE as usize];
         reader(IDX_ZONE_IDX + (IDX_BLOCK_SIZE * offset), &mut bytes);
         let idx = bincode::deserialize(&bytes).map_err(|e| format!("Failed to deserialize: {}", e))?;
         Ok(idx)
@@ -177,9 +178,9 @@ mod test {
         let mut reader = get_reader();
 
         let res = writer.write(&message, write).unwrap();
-        let out = reader.read_topic_message::<String>(res.start_idx, read).unwrap();
+        let out = reader.read_topic_message::<String>(res.height, read);
 
-        assert_eq!(out, message);
+        assert_eq!(out.unwrap(), message);
     }
 
     #[test]
@@ -195,9 +196,9 @@ mod test {
         let res_two = writer.write(&bytes_two, write).unwrap();
         let res_three = writer.write(&bytes_three, write).unwrap();
 
-        let out = reader.read_topic_message::<String>(res.start_idx, read).unwrap();
-        let out_two = reader.read_topic_message::<String>(res_two.start_idx, read).unwrap();
-        let out_three = reader.read_topic_message::<String>(res_three.start_idx, read).unwrap();
+        let out = reader.read_topic_message::<String>(res.height, read).unwrap();
+        let out_two = reader.read_topic_message::<String>(res_two.height, read).unwrap();
+        let out_three = reader.read_topic_message::<String>(res_three.height, read).unwrap();
 
         assert_eq!(out, bytes);
         assert_eq!(out_two, bytes_two);
@@ -215,8 +216,8 @@ mod test {
         let res = writer.write(&bytes, write).unwrap();
         let res_two = writer.write(&bytes_two, write).unwrap();
 
-        let out = reader.read_topic_message::<Vec<u8>>(res.start_idx, read).unwrap();
-        let out_two = reader.read_topic_message::<Vec<u8>>(res_two.start_idx, read).unwrap();
+        let out = reader.read_topic_message::<Vec<u8>>(0, read).unwrap();
+        let out_two = reader.read_topic_message::<Vec<u8>>(1, read).unwrap();
 
         assert_eq!(out, bytes);
         assert_eq!(out_two, bytes_two);
@@ -235,9 +236,9 @@ mod test {
         let res_two = writer.write(&bytes_two, write).unwrap();
         let res_three = writer.write(&bytes_three, write).unwrap();
 
-        let out = reader.read_topic_message::<Vec<u8>>(res.start_idx, read).unwrap();
-        let out_two = reader.read_topic_message::<Vec<u8>>(res_two.start_idx, read).unwrap();
-        let out_three = reader.read_topic_message::<Vec<u8>>(res_three.start_idx, read).unwrap();
+        let out = reader.read_topic_message::<Vec<u8>>(0, read).unwrap();
+        let out_two = reader.read_topic_message::<Vec<u8>>(1, read).unwrap();
+        let out_three = reader.read_topic_message::<Vec<u8>>(2, read).unwrap();
 
         assert_eq!(out, bytes);
         assert_eq!(out_two, bytes_two);

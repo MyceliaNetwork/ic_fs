@@ -1,7 +1,7 @@
 pub const WASM_PAGE_SIZE: u64 = 65536;
 
 pub const BLOCK_SIZE: u64 = 512;
-pub const IDX_BLOCK_SIZE: u64 = 32;
+pub const IDX_BLOCK_SIZE: u64 = 40;
 pub const U64_SIZE: u64 = 8;
 pub const TOPIC_BLOCK_MAX_SIZE: usize = 512;
 
