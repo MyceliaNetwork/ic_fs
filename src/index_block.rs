@@ -24,7 +24,7 @@ mod test {
         };
 
         let res = bincode::serialize(&idx).unwrap();
-        assert_eq!(res.len(), 32);
+        assert_eq!(res.len(), 40);
         assert_eq!(idx, bincode::deserialize(&res).unwrap());
     }
 }
