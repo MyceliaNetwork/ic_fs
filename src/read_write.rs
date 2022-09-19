@@ -1,6 +1,6 @@
 use std::fs::read;
 use std::io::{Read, Write};
-use log::{debug, info};
+use log::{debug};
 use serde::de::DeserializeOwned;
 
 use serde::Serialize;
@@ -60,7 +60,7 @@ impl MemoryWriter
 
         // write data
         let offset = IDX_ZONE_END + (self.data_block_offset * BLOCK_SIZE);
-        info!("Writing data at offset {} for idx {:?}", offset, idx);
+        debug!("Writing data at offset {} for idx {:?}", offset, idx);
         writer(offset, &bytes);
 
         // move offset
@@ -74,7 +74,7 @@ impl MemoryWriter
         let bytes = bincode::serialize(idx).map_err(|e| format!("Failed to serialize: {}", e))?;
         // Move to index region, move over number of blocks
         let mut offset = IDX_ZONE_IDX + (idx.height * IDX_BLOCK_SIZE);
-        info!("Writing index block: {:?} offset {}", idx, offset);
+        debug!("Writing index block: {:?} offset {}", idx, offset);
         writer(offset, &bytes);
         Ok(())
     }

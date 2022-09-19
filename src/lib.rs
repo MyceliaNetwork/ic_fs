@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use ic_cdk::api::stable::StableWriter;
-use log::{debug, info};
+use log::{debug};
 use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
 
@@ -192,8 +192,6 @@ mod tests {
     use std::borrow::BorrowMut;
     use std::cell::RefCell;
     use std::ops::Range;
-
-    use log::info;
 
     use crate::{BlockRead, BlockWrite, EventFilesystem, IDX_ZONE_END, read_topic_block, TOPIC_HEADER_MAGIC};
 
